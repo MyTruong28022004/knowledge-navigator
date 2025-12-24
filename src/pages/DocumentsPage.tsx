@@ -1,0 +1,244 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  Search,
+  Plus,
+  FileText,
+  MoreHorizontal,
+  Eye,
+  Pencil,
+  Archive,
+  Trash2,
+  Upload,
+} from 'lucide-react';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { StatusBadge, ClassificationBadge } from '@/components/ui/status-badge';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { mockDocuments } from '@/data/mockData';
+import { Document, DocumentStatus, ClassificationLevel } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
+
+export default function DocumentsPage() {
+  const { hasPermission } = useAuth();
+  const [documents] = useState<Document[]>(mockDocuments);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<DocumentStatus | 'all'>('all');
+  const [classificationFilter, setClassificationFilter] = useState<ClassificationLevel | 'all'>('all');
+
+  const canEdit = hasPermission('documents.edit');
+
+  const filteredDocuments = documents.filter((doc) => {
+    const matchesSearch =
+      doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      doc.ownerDepartment.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || doc.status === statusFilter;
+    const matchesClassification =
+      classificationFilter === 'all' || doc.classification === classificationFilter;
+
+    return matchesSearch && matchesStatus && matchesClassification;
+  });
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('vi-VN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  return (
+    <div className="flex h-full flex-col">
+      <PageHeader
+        title="Documents"
+        description="Quản lý tài liệu tri thức doanh nghiệp"
+        breadcrumbs={[{ label: 'Documents' }]}
+        actions={
+          canEdit && (
+            <Button className="gap-2">
+              <Upload className="h-4 w-4" />
+              Upload Document
+            </Button>
+          )
+        }
+      />
+
+      <div className="flex-1 overflow-auto p-6">
+        {/* Filters */}
+        <div className="mb-6 flex items-center gap-4">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search documents..."
+              className="pl-10"
+            />
+          </div>
+
+          <Select
+            value={statusFilter}
+            onValueChange={(v) => setStatusFilter(v as DocumentStatus | 'all')}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="review">In Review</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="archived">Archived</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={classificationFilter}
+            onValueChange={(v) => setClassificationFilter(v as ClassificationLevel | 'all')}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Classification" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All levels</SelectItem>
+              <SelectItem value="public">Public</SelectItem>
+              <SelectItem value="internal">Internal</SelectItem>
+              <SelectItem value="confidential">Confidential</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Table */}
+        <div className="rounded-lg border border-border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[40%]">Title</TableHead>
+                <TableHead>Department</TableHead>
+                <TableHead>Classification</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Version</TableHead>
+                <TableHead>Updated</TableHead>
+                <TableHead className="w-12"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredDocuments.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-32 text-center">
+                    <div className="flex flex-col items-center justify-center text-muted-foreground">
+                      <FileText className="h-8 w-8 mb-2" />
+                      <p>No documents found</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredDocuments.map((doc) => (
+                  <TableRow key={doc.id}>
+                    <TableCell>
+                      <Link
+                        to={`/documents/${doc.id}`}
+                        className="font-medium text-foreground hover:text-primary transition-colors"
+                      >
+                        {doc.title}
+                      </Link>
+                      <div className="mt-1 flex gap-1 flex-wrap">
+                        {doc.tags.slice(0, 3).map((tag) => (
+                          <Badge key={tag} variant="secondary" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                        {doc.tags.length > 3 && (
+                          <Badge variant="secondary" className="text-xs">
+                            +{doc.tags.length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{doc.ownerDepartment}</TableCell>
+                    <TableCell>
+                      <ClassificationBadge level={doc.classification} />
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={doc.status} />
+                    </TableCell>
+                    <TableCell className="font-mono text-sm text-muted-foreground">
+                      {doc.currentVersion}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {formatDate(doc.updatedAt)}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link to={`/documents/${doc.id}`}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View
+                            </Link>
+                          </DropdownMenuItem>
+                          {canEdit && (
+                            <>
+                              <DropdownMenuItem>
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Edit Metadata
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Upload className="mr-2 h-4 w-4" />
+                                Upload New Version
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem>
+                                <Archive className="mr-2 h-4 w-4" />
+                                Archive
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Pagination info */}
+        <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+          <p>
+            Showing {filteredDocuments.length} of {documents.length} documents
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
