@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Search,
   Plus,
@@ -10,12 +10,12 @@ import {
   Archive,
   Trash2,
   Upload,
-} from 'lucide-react';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { StatusBadge, ClassificationBadge } from '@/components/ui/status-badge';
-import { Badge } from '@/components/ui/badge';
+} from "lucide-react";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { StatusBadge, ClassificationBadge } from "@/components/ui/status-badge";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -23,50 +23,91 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { mockDocuments } from '@/data/mockData';
-import { Document, DocumentStatus, ClassificationLevel } from '@/types';
-import { useAuth } from '@/contexts/AuthContext';
+} from "@/components/ui/select";
+import { useRef, useMemo } from "react";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+import { Label } from "@/components/ui/label";
+
+import { mockDocuments } from "@/data/mockData";
+import { Document, DocumentStatus, ClassificationLevel } from "@/types";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function DocumentsPage() {
   const { hasPermission } = useAuth();
   const [documents] = useState<Document[]>(mockDocuments);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<DocumentStatus | 'all'>('all');
-  const [classificationFilter, setClassificationFilter] = useState<ClassificationLevel | 'all'>('all');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<DocumentStatus | "all">(
+    "all"
+  );
+  const [classificationFilter, setClassificationFilter] = useState<
+    ClassificationLevel | "all"
+  >("all");
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
 
-  const canEdit = hasPermission('documents.edit');
+  const [uploadDepartment, setUploadDepartment] = useState<string>("");
+  const [uploadClassification, setUploadClassification] = useState<
+    ClassificationLevel | ""
+  >("");
+  const [uploadReviewLevel, setUploadReviewLevel] = useState<string>("");
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Department options: lấy từ list hiện có (mock) cho nhanh
+  const departmentOptions = useMemo(() => {
+    const depts = Array.from(
+      new Set(documents.map((d) => d.ownerDepartment))
+    ).filter(Boolean);
+    return depts.length ? depts : ["HR", "IT", "Finance", "Operations"];
+  }, [documents]);
+
+  // Cấp review options: tuỳ business, tạm để 1..3
+  const reviewLevelOptions = ["Knowledge Manager", "Administrator"];
+
+  const canContinueUpload =
+    !!uploadDepartment && !!uploadClassification && !!uploadReviewLevel;
+
+  const canEdit = hasPermission("documents.edit");
 
   const filteredDocuments = documents.filter((doc) => {
     const matchesSearch =
       doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       doc.ownerDepartment.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || doc.status === statusFilter;
+    const matchesStatus = statusFilter === "all" || doc.status === statusFilter;
     const matchesClassification =
-      classificationFilter === 'all' || doc.classification === classificationFilter;
+      classificationFilter === "all" ||
+      doc.classification === classificationFilter;
 
     return matchesSearch && matchesStatus && matchesClassification;
   });
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('vi-VN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+    return new Date(dateString).toLocaleDateString("vi-VN", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     });
   };
 
@@ -75,10 +116,18 @@ export default function DocumentsPage() {
       <PageHeader
         title="Documents"
         description="Quản lý tài liệu tri thức doanh nghiệp"
-        breadcrumbs={[{ label: 'Documents' }]}
+        breadcrumbs={[{ label: "Documents" }]}
         actions={
           canEdit && (
-            <Button className="gap-2">
+            <Button
+              className="gap-2"
+              onClick={() => {
+                setUploadDepartment("");
+                setUploadClassification("");
+                setUploadReviewLevel("");
+                setUploadDialogOpen(true);
+              }}
+            >
               <Upload className="h-4 w-4" />
               Upload Document
             </Button>
@@ -101,7 +150,7 @@ export default function DocumentsPage() {
 
           <Select
             value={statusFilter}
-            onValueChange={(v) => setStatusFilter(v as DocumentStatus | 'all')}
+            onValueChange={(v) => setStatusFilter(v as DocumentStatus | "all")}
           >
             <SelectTrigger className="w-40">
               <SelectValue placeholder="Status" />
@@ -117,7 +166,9 @@ export default function DocumentsPage() {
 
           <Select
             value={classificationFilter}
-            onValueChange={(v) => setClassificationFilter(v as ClassificationLevel | 'all')}
+            onValueChange={(v) =>
+              setClassificationFilter(v as ClassificationLevel | "all")
+            }
           >
             <SelectTrigger className="w-40">
               <SelectValue placeholder="Classification" />
@@ -167,7 +218,11 @@ export default function DocumentsPage() {
                       </Link>
                       <div className="mt-1 flex gap-1 flex-wrap">
                         {doc.tags.slice(0, 3).map((tag) => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
+                          <Badge
+                            key={tag}
+                            variant="secondary"
+                            className="text-xs"
+                          >
                             {tag}
                           </Badge>
                         ))}
@@ -178,7 +233,9 @@ export default function DocumentsPage() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{doc.ownerDepartment}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {doc.ownerDepartment}
+                    </TableCell>
                     <TableCell>
                       <ClassificationBadge level={doc.classification} />
                     </TableCell>
@@ -194,7 +251,11 @@ export default function DocumentsPage() {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                          >
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -239,6 +300,121 @@ export default function DocumentsPage() {
           </p>
         </div>
       </div>
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        // accept=".pdf,.doc,.docx,.xlsx,.ppt,.pptx"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+
+          // TODO: gọi API upload ở đây
+          // payload ví dụ:
+          // {
+          //   file,
+          //   department: uploadDepartment,
+          //   classification: uploadClassification,
+          //   reviewLevel: uploadReviewLevel,
+          // }
+
+          // đóng dialog sau khi chọn file
+          setUploadDialogOpen(false);
+
+          // reset input để có thể chọn lại cùng 1 file lần sau
+          e.currentTarget.value = "";
+        }}
+      />
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Upload document</DialogTitle>
+            <DialogDescription>
+              Chọn thông tin tài liệu trước khi upload
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label>Department</Label>
+              <Select
+                value={uploadDepartment}
+                onValueChange={setUploadDepartment}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Department" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departmentOptions.map((dept) => (
+                    <SelectItem key={dept} value={dept}>
+                      {dept}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Classification</Label>
+              <Select
+                value={uploadClassification}
+                onValueChange={(v) =>
+                  setUploadClassification(v as ClassificationLevel)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Classification" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="public">Public</SelectItem>
+                  <SelectItem value="internal">Internal</SelectItem>
+                  <SelectItem value="confidential">Confidential</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Reviewer</Label>
+              <Select
+                value={uploadReviewLevel}
+                onValueChange={setUploadReviewLevel}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Reviewer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {reviewLevelOptions.map((lvl) => (
+                    <SelectItem key={lvl} value={lvl}>
+                      {lvl}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setUploadDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              disabled={!canContinueUpload}
+              onClick={() => {
+                // mở file picker sau khi đã chọn đủ metadata
+                fileInputRef.current?.click();
+              }}
+            >
+              Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
